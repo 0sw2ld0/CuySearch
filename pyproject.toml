@@ -1,0 +1,43 @@
+[build-system]
+requires = ["setuptools>=69"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "cuysearch"
+version = "0.1.0"
+description = "Web search and page reading for AI agents, from the caller's own connection"
+readme = "README.md"
+license = "MIT"
+license-files = ["LICENSE", "PROCEDENCIA.md"]
+authors = [{ name = "Oswaldo Leon" }]
+requires-python = ">=3.11"
+dependencies = [
+  "httpx>=0.27,<1",
+]
+
+[project.optional-dependencies]
+servicio = [
+  "fastapi>=0.115,<1",
+  "pydantic-settings>=2.6,<3",
+  "uvicorn>=0.32,<1",
+]
+dev = [
+  "pytest>=8,<9",
+  "pytest-asyncio>=0.24,<1",
+]
+
+[project.urls]
+Source = "https://github.com/0sw2ld0/CuySearch"
+
+[project.scripts]
+cuysearch = "cuysearch.servicio.main:run"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+addopts = "-q -m 'not red'"
+asyncio_mode = "auto"
+pythonpath = ["src"]
+asyncio_default_fixture_loop_scope = "function"
+markers = ["red: sale a internet de verdad (pytest -m red)"]
