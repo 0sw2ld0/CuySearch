@@ -12,11 +12,45 @@ from urllib.parse import urljoin
 import httpx
 
 from cuysearch.motores.base import USER_AGENT
-from cuysearch.security import UnsafeUrlError, validate_resolved_public_url
+from cuysearch.security import UnsafeUrlError, resolve_public_addresses
 from cuysearch.tipos import ErrorDeLectura, Pagina
 
 # Nombre anterior, por compatibilidad.
 ExtractionError = ErrorDeLectura
+
+
+@asynccontextmanager
+async def _open_pinned(client: httpx.AsyncClient, url: str, addresses: list[str]):
+    """GET a `url` conectando a una de las IP ya validadas, sin volver a resolver el nombre.
+
+    El nombre sigue en la cabecera Host y, en HTTPS, en SNI, que es contra lo que se comprueba el
+    certificado. En HTTPS se pide `Connection: close`: el pool de httpx distingue conexiones por IP,
+    no por nombre, y no debe reutilizarse una conexión verificada para otro nombre con la misma IP.
+    Si una IP no acepta la conexión, se prueba la siguiente.
+    """
+
+    target = httpx.URL(url)
+    headers = {"Host": target.netloc.decode("ascii")}
+    extensions = {}
+    if target.scheme == "https":
+        headers["Connection"] = "close"
+        extensions["sni_hostname"] = target.raw_host.decode("ascii")
+    failure: httpx.ConnectError | None = None
+    for address in addresses:
+        request = client.build_request(
+            "GET", target.copy_with(host=address), headers=headers, extensions=extensions
+        )
+        try:
+            response = await client.send(request, stream=True)
+        except httpx.ConnectError as exc:
+            failure = exc
+            continue
+        try:
+            yield response
+        finally:
+            await response.aclose()
+        return
+    raise failure or httpx.ConnectError("Sin direcciones a las que conectar")
 
 
 class _LimitedHTMLTextParser(HTMLParser):
@@ -179,12 +213,12 @@ class PageExtractor:
 
         for redirect_count in range(self.max_redirects + 1):
             try:
-                await validate_resolved_public_url(current_url)
+                addresses = await resolve_public_addresses(current_url)
             except UnsafeUrlError as exc:
                 raise ExtractionError(str(exc)) from exc
 
             try:
-                async with client.stream("GET", current_url) as response:
+                async with _open_pinned(client, current_url, addresses) as response:
                     if response.status_code in {301, 302, 303, 307, 308}:
                         location = response.headers.get("location")
                         if not location or redirect_count >= self.max_redirects:

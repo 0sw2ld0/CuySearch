@@ -32,13 +32,30 @@ def validate_public_url(url: str) -> str:
         address = ipaddress.ip_address(hostname)
     except ValueError:
         address = None
-    if address is not None and not address.is_global:
+    if address is not None and not _is_public(address):
         raise UnsafeUrlError("No se permiten IPs privadas o reservadas")
     return url
 
 
+def _is_public(address: ipaddress.IPv4Address | ipaddress.IPv6Address) -> bool:
+    """Global y no reservada: Python da por global la IPv6 «compatible» ::a.b.c.d (::/96, reservada)."""
+
+    return address.is_global and not address.is_reserved
+
+
 async def validate_resolved_public_url(url: str) -> str:
     """Evita SSRF también cuando un dominio resuelve a una IP privada."""
+
+    await resolve_public_addresses(url)
+    return url
+
+
+async def resolve_public_addresses(url: str) -> list[str]:
+    """Resuelve el nombre una sola vez y devuelve sus IP, todas públicas, en el orden del sistema.
+
+    Quien conecte debe hacerlo a una de estas IP y no volver a resolver el nombre: si no, un DNS que
+    cambia entre la comprobación y la conexión («DNS rebinding») lleva a una red interna.
+    """
 
     validate_public_url(url)
     hostname = urlparse(url).hostname
@@ -54,7 +71,7 @@ async def validate_resolved_public_url(url: str) -> str:
     except socket.gaierror as exc:
         raise UnsafeUrlError("No se pudo resolver el dominio") from exc
 
-    addresses = {info[4][0] for info in infos if info[4]}
+    addresses = list(dict.fromkeys(info[4][0] for info in infos if info[4]))
     if not addresses:
         raise UnsafeUrlError("El dominio no tiene direcciones válidas")
     for value in addresses:
@@ -62,7 +79,7 @@ async def validate_resolved_public_url(url: str) -> str:
             address = ipaddress.ip_address(value)
         except ValueError as exc:
             raise UnsafeUrlError("El dominio resolvió a una dirección inválida") from exc
-        if not address.is_global:
+        if not _is_public(address):
             raise UnsafeUrlError("El dominio resuelve a una red no pública")
-    return url
+    return addresses
 

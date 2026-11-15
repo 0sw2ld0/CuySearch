@@ -40,12 +40,13 @@ def red_falsa(monkeypatch):
         validadas.append(url)
         if "privado" in url:
             raise modulo.UnsafeUrlError("El dominio resuelve a una red no pública")
-        return url
+        return ["93.184.216.34"]
 
     def responder(request):
-        return rutas[str(request.url)]
+        # Se conecta a la IP validada; la URL pedida se reconstruye con la cabecera Host.
+        return rutas[f"{request.url.scheme}://{request.headers['host']}{request.url.raw_path.decode()}"]
 
-    monkeypatch.setattr(modulo, "validate_resolved_public_url", validar)
+    monkeypatch.setattr(modulo, "resolve_public_addresses", validar)
     original = PageExtractor._new_client
 
     def cliente(self):
