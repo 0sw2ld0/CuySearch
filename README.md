@@ -11,7 +11,7 @@ tráfico. Si un motor falla o bloquea, se prueba el siguiente.
 - Límites de tamaño, de redirecciones y de concurrencia, y caché en memoria.
 
 ```bash
-pip install "cuysearch @ git+https://github.com/0sw2ld0/CuySearch@v0.1.0"
+pip install "cuysearch @ git+https://github.com/0sw2ld0/CuySearch@v0.1.1"
 ```
 
 ```python
@@ -85,7 +85,7 @@ conexión. Si necesitas fiabilidad, usa tu SearXNG o una API con clave.
 ## Servicio HTTP (opcional)
 
 ```bash
-pip install "cuysearch[servicio] @ git+https://github.com/0sw2ld0/CuySearch@v0.1.0"
+pip install "cuysearch[servicio] @ git+https://github.com/0sw2ld0/CuySearch@v0.1.1"
 cuysearch            # o: python -m cuysearch.servicio
 ```
 
